@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EWI EasyPlay Scores - 智能多版本互動簡譜神器</title>
+    <meta name="description" content="專為 EWI 玩家設計的開源練習工具，支援 YouTube 和 Spotify 音樂自動轉換為三種難度的簡譜">
+    <meta name="keywords" content="EWI, 簡譜, 音樂練習, 開源, Spotify, YouTube">
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="EWI EasyPlay Scores">
+    <meta property="og:description" content="智能多版本互動簡譜神器">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://paul720810.dpdns.org">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- 載入中畫面 -->
+        <div class="loading-screen">
+            <div class="loading-spinner"></div>
+            <p>載入中...</p>
+        </div>
+    </div>
+    
+    <!-- 外部腳本 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.0/build/Midi.min.js"></script>
+    
+    <!-- 主應用 -->
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
