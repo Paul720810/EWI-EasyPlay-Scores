@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     
     # 安全設定
     SECRET_KEY: str = "your-secret-key-change-in-production"
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "https://paul720810.dpdns.org"]
+    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "https://ewi.paul720810.dpdns.org", "https://paul720810.dpdns.org"]
     
     # 檔案路徑
     TEMP_DIR: str = "./temp"
