@@ -3,191 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EWI EasyPlay Scores - 智能簡譜神器</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>EWI EasyPlay Scores - 智能多版本互動簡譜神器</title>
+    <meta name="description" content="專為 EWI 玩家設計的開源練習工具，支援 YouTube 和 Spotify 音樂自動轉換為三種難度的簡譜">
+    <meta name="keywords" content="EWI, 簡譜, 音樂練習, 開源, Spotify, YouTube">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="EWI EasyPlay Scores">
+    <meta property="og:description" content="智能多版本互動簡譜神器">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://ewi.paul720810.dpdns.org">
+
+    <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <!-- 頂部導航 -->
-        <nav class="navbar">
-            <div class="nav-brand">
-                <h1>🎵 EWI EasyPlay Scores</h1>
-                <span class="version">v1.0.0</span>
-            </div>
-            <div class="nav-links">
-                <a href="#upload">轉譜</a>
-                <a href="#practice">練習</a>
-                <a href="#spotify">Spotify</a>
-                <a href="#help">說明</a>
-            </div>
-        </nav>
-
-        <!-- 主要內容區域 -->
-        <main class="main-content">
-            <!-- 歡迎區域 -->
-            <section class="hero-section">
-                <div class="hero-content">
-                    <h2>🎺 專為 EWI 設計的智能簡譜神器</h2>
-                    <p>自動轉譜 • 三種難度 • 運指提示 • 互動練習</p>
-                    <div class="hero-stats">
-                        <div class="stat">
-                            <span class="stat-number">3</span>
-                            <span class="stat-label">難度等級</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-number">∞</span>
-                            <span class="stat-label">免費使用</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-number">🎵</span>
-                            <span class="stat-label">開源專案</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 音樂轉譜區域 -->
-            <section id="upload" class="upload-section card">
-                <h2>🎼 音樂轉譜</h2>
-                <div class="upload-tabs">
-                    <button class="tab-btn active" onclick="switchTab('youtube')">YouTube 連結</button>
-                    <button class="tab-btn" onclick="switchTab('file')">本地文件</button>
-                    <button class="tab-btn" onclick="switchTab('spotify')">Spotify</button>
-                </div>
-                
-                <div id="youtube-tab" class="tab-content active">
-                    <div class="input-group">
-                        <input type="url" id="youtube-url" placeholder="貼上 YouTube 連結...">
-                        <button onclick="processYouTube()" class="btn-primary">
-                            <span class="btn-icon">🎵</span>
-                            開始轉譜
-                        </button>
-                    </div>
-                </div>
-                
-                <div id="file-tab" class="tab-content">
-                    <div class="drop-zone" id="drop-zone">
-                        <div class="drop-zone-content">
-                            <div class="drop-icon">📁</div>
-                            <p>拖拽音頻文件到這裡</p>
-                            <p class="drop-or">或</p>
-                            <input type="file" id="audio-file" accept="audio/*" style="display: none;">
-                            <button onclick="document.getElementById('audio-file').click()" class="btn-secondary">選擇文件</button>
-                            <p class="file-info">支援 MP3, WAV, M4A 等格式</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div id="spotify-tab" class="tab-content">
-                    <div class="spotify-connect">
-                        <button onclick="connectSpotify()" class="btn-spotify">
-                            <span class="btn-icon">🎧</span>
-                            連接 Spotify
-                        </button>
-                        <div id="spotify-player" class="spotify-player"></div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 簡譜顯示區域 -->
-            <section id="practice" class="sheet-section card">
-                <h2>🎼 簡譜顯示</h2>
-                <div id="sheet-display" class="sheet-display">
-                    <div class="sheet-placeholder">
-                        <div class="placeholder-icon">🎼</div>
-                        <h3>準備開始音樂之旅</h3>
-                        <p>上傳音頻文件或輸入 YouTube 連結開始轉譜</p>
-                        <div class="placeholder-features">
-                            <div class="feature">
-                                <span class="feature-icon">🎯</span>
-                                <span>精準轉譜</span>
-                            </div>
-                            <div class="feature">
-                                <span class="feature-icon">🎺</span>
-                                <span>EWI 運指</span>
-                            </div>
-                            <div class="feature">
-                                <span class="feature-icon">🎵</span>
-                                <span>互動練習</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Spotify 整合區域 -->
-            <section id="spotify" class="spotify-section card">
-                <h2>🎧 Spotify 整合</h2>
-                <div class="spotify-content">
-                    <div class="spotify-status" id="spotify-status">
-                        <div class="status-icon">🔗</div>
-                        <div class="status-text">
-                            <h3>連接你的 Spotify</h3>
-                            <p>連接後可以直接播放 Spotify 音樂並轉換為簡譜</p>
-                        </div>
-                        <button onclick="connectSpotify()" class="btn-spotify">連接 Spotify</button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 說明和幫助 -->
-            <section id="help" class="help-section card">
-                <h2>❓ 使用說明</h2>
-                <div class="help-content">
-                    <div class="help-grid">
-                        <div class="help-item">
-                            <div class="help-icon">🎼</div>
-                            <h3>如何轉譜</h3>
-                            <p>支援 YouTube 連結、本地音頻文件和 Spotify 音樂。選擇難度等級後點擊轉譜即可。</p>
-                        </div>
-                        
-                        <div class="help-item">
-                            <div class="help-icon">🎺</div>
-                            <h3>EWI 運指</h3>
-                            <p>系統會自動生成 EWI 專用的運指提示，幫助你更好地演奏電子管樂器。</p>
-                        </div>
-                        
-                        <div class="help-item">
-                            <div class="help-icon">🎵</div>
-                            <h3>互動練習</h3>
-                            <p>使用播放控制功能，調整速度，開啟循環模式，讓練習更有效率。</p>
-                        </div>
-                        
-                        <div class="help-item">
-                            <div class="help-icon">🎧</div>
-                            <h3>Spotify 整合</h3>
-                            <p>連接 Spotify 帳號後，可以直接播放和轉換 Spotify 上的音樂。</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </main>
-
-        <!-- 頁腳 -->
-        <footer class="footer">
-            <div class="footer-content">
-                <div class="footer-section">
-                    <h4>EWI EasyPlay Scores</h4>
-                    <p>開源的 EWI 智能簡譜神器</p>
-                </div>
-                <div class="footer-section">
-                    <h4>連結</h4>
-                    <a href="https://github.com/Paul720810/EWI-EasyPlay-Scores" target="_blank">GitHub</a>
-                    <a href="#help">使用說明</a>
-                </div>
-                <div class="footer-section">
-                    <h4>授權</h4>
-                    <p>MIT License - 完全免費開源</p>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>&copy; 2026 EWI EasyPlay Scores. Made with ❤️ for EWI community.</p>
-            </div>
-        </footer>
+    <div id="app">
+        <div class="loading-screen">
+            <div class="loading-spinner"></div>
+            <p>載入中...</p>
+        </div>
     </div>
 
-    <!-- JavaScript 載入 -->
-    <script src="script.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.0/build/Midi.min.js"></script>
+    <script type="module" src="/src/main.js"></script>
 </body>
 </html>
