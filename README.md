@@ -1,11 +1,14 @@
 # 🎵 EWI EasyPlay Scores
 
-> 智能多版本互動簡譜神器 - 專為 EWI 玩家設計的開源練習工具
+⚠️ **[DEMO 模式] 目前此專案為架構演示版本，核心業務邏輯（音訊處理、MIDI 生成、難度分級）尚未實現。僅提供 Mock API 與前端骨架用於概念驗證。詳見 [EWI-READINESS-REPORT.md](/home/opc/EWI-READINESS-REPORT.md)。**
+
+> 智能多版本互動簡譜神器 - 專為 EWI 玩家設計的開源練習工具 (開發中)
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Node.js 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
+[![Status](https://img.shields.io/badge/Status-Demo%20%2F%20PoC-orange.svg)]
 
 ## ✨ 特色功能
 

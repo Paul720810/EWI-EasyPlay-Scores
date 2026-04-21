@@ -1,30 +1,34 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-import os
+"""
+EWI EasyPlay - FastAPI 主應用
+集成所有 API 端點和服務
+"""
+
 import logging
-from pathlib import Path
-from dotenv import load_dotenv
-import json
 import time
 
-# 載入環境變數
-load_dotenv()
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Form
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from typing import Optional, List, Dict
+import os
+from pathlib import Path
 
-# 設置日誌
+# 配置日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # 創建 FastAPI 應用
 app = FastAPI(
     title="EWI EasyPlay Scores API",
-    description="EWI 智能簡譜生成 API",
+    description="AI 音樂轉 EWI 運指系統",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json"
 )
 
-# CORS 設置
+# 添加 CORS 中間件
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -93,19 +97,19 @@ async def process_youtube(request: dict):
     try:
         url = request.get("url")
         difficulty = request.get("difficulty", "normal")
-        
+
         if not url:
             raise HTTPException(status_code=400, detail="URL is required")
-        
+
         logger.info(f"Processing YouTube URL: {url}")
-        
+
         # 模擬處理延遲
         import asyncio
         await asyncio.sleep(2)
-        
+
         # 獲取對應難度的簡譜
         sheet_data = SAMPLE_SHEETS.get(difficulty, SAMPLE_SHEETS["normal"])
-        
+
         sheet_music = {
             "title": f"YouTube 轉譜結果 ({difficulty})",
             "notes": sheet_data["notes"],
@@ -116,7 +120,7 @@ async def process_youtube(request: dict):
             "source": "youtube",
             "url": url[:50] + "..." if len(url) > 50 else url
         }
-        
+
         return {
             "success": True,
             "sheet_music": sheet_music,
@@ -127,7 +131,7 @@ async def process_youtube(request: dict):
             },
             "message": "YouTube 音頻處理成功"
         }
-            
+
     except Exception as e:
         logger.error(f"YouTube processing error: {str(e)}")
         return {"success": False, "error": str(e)}
@@ -141,16 +145,16 @@ async def upload_audio(
     try:
         if not audio.content_type.startswith('audio/'):
             raise HTTPException(status_code=400, detail="只支援音頻文件")
-        
+
         logger.info(f"Processing uploaded file: {audio.filename}")
-        
+
         # 模擬處理延遲
         import asyncio
         await asyncio.sleep(3)
-        
+
         # 獲取對應難度的簡譜
         sheet_data = SAMPLE_SHEETS.get(difficulty, SAMPLE_SHEETS["normal"])
-        
+
         sheet_music = {
             "title": f"{audio.filename} 轉譜結果 ({difficulty})",
             "notes": sheet_data["notes"],
@@ -161,7 +165,7 @@ async def upload_audio(
             "source": "upload",
             "filename": audio.filename
         }
-        
+
         return {
             "success": True,
             "sheet_music": sheet_music,
@@ -172,7 +176,7 @@ async def upload_audio(
             },
             "message": "音頻文件處理成功"
         }
-            
+
     except Exception as e:
         logger.error(f"File upload error: {str(e)}")
         return {"success": False, "error": str(e)}
@@ -183,14 +187,14 @@ async def spotify_auth():
     try:
         client_id = os.getenv("SPOTIFY_CLIENT_ID", "d066b146a6d4440fbc395456da14b543")
         redirect_uri = os.getenv("SPOTIFY_REDIRECT_URI", "https://ewi.paul720810.dpdns.org/api/spotify/callback")
-        
+
         scopes = [
             "user-read-playback-state",
             "user-modify-playback-state",
             "user-read-currently-playing",
             "streaming"
         ]
-        
+
         auth_url = (
             f"https://accounts.spotify.com/authorize?"
             f"client_id={client_id}&"
@@ -198,9 +202,9 @@ async def spotify_auth():
             f"redirect_uri={redirect_uri}&"
             f"scope={' '.join(scopes)}"
         )
-        
+
         return {"auth_url": auth_url}
-        
+
     except Exception as e:
         logger.error(f"Spotify auth error: {str(e)}")
         return {"success": False, "error": str(e)}
@@ -210,10 +214,10 @@ async def spotify_callback(code: str = None, error: str = None):
     """Spotify 授權回調"""
     if error:
         return {"success": False, "error": f"Spotify 授權失敗: {error}"}
-    
+
     if not code:
         return {"success": False, "error": "未收到授權碼"}
-    
+
     return {
         "success": True,
         "message": "Spotify 授權成功！現在可以使用 Spotify 功能了。",
@@ -233,7 +237,7 @@ async def get_difficulties():
                 "features": ["基礎指法", "簡單節奏", "常用音階"]
             },
             {
-                "id": "normal", 
+                "id": "normal",
                 "name": "普通",
                 "description": "標準難度，適合有基礎的演奏者",
                 "tempo_range": "90-130 BPM",
@@ -277,7 +281,7 @@ async def get_sample_sheet(difficulty: str):
     """獲取示例簡譜"""
     if difficulty not in SAMPLE_SHEETS:
         raise HTTPException(status_code=404, detail="難度等級不存在")
-    
+
     sheet_data = SAMPLE_SHEETS[difficulty]
     return {
         "difficulty": difficulty,
