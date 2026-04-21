@@ -33,6 +33,57 @@
             <div class="loading-spinner"></div>
             <p>載入中...</p>
         </div>
+
+        <div class="container">
+            <header class="header">
+                <h1>🎵 EWI EasyPlay Scores</h1>
+                <p class="subtitle">智能多版本互動簡譜神器</p>
+                <p class="description">如果自動載入延遲，這個靜態備援畫面會先顯示，避免你看到空白頁。</p>
+            </header>
+
+            <section class="card source-selection">
+                <div class="source-tabs">
+                    <button class="tab-btn active" type="button">YouTube 連結</button>
+                    <button class="tab-btn" type="button">Spotify 搜尋</button>
+                    <button class="tab-btn" type="button">本地音檔</button>
+                </div>
+
+                <div class="source-panel active">
+                    <div class="input-group">
+                        <label for="youtube-url-fallback">YouTube 連結</label>
+                        <input id="youtube-url-fallback" type="url" placeholder="貼上 YouTube 連結..." readonly>
+                        <button class="btn primary-btn" type="button">開始轉譜</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>🎼 簡譜顯示</h2>
+                <div class="sheet-display">
+                    <div class="sheet-placeholder">
+                        <div class="placeholder-icon">🎼</div>
+                        <h3>頁面已載入</h3>
+                        <p>如果你看得到這段文字，代表站台內容已經不是空白了。</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>❓ 使用說明</h2>
+                <div class="help-grid">
+                    <div class="help-item">
+                        <div class="help-icon">🎯</div>
+                        <h3>轉譜</h3>
+                        <p>上傳音檔或貼上 YouTube 連結開始處理。</p>
+                    </div>
+                    <div class="help-item">
+                        <div class="help-icon">🎺</div>
+                        <h3>EWI 運指</h3>
+                        <p>系統會生成適合 EWI 的運指提示與難度版本。</p>
+                    </div>
+                </div>
+            </section>
+        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
