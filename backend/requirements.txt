@@ -114,3 +114,4 @@ wrapt==2.1.2
 zipp==3.23.1
 yt-dlp==2024.10.16
 midiutil==1.2.3
+spotipy==2.23.0
