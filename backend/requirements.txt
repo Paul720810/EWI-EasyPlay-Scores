@@ -112,3 +112,5 @@ websockets==15.0.1
 Werkzeug==3.1.8
 wrapt==2.1.2
 zipp==3.23.1
+yt-dlp==2024.10.16
+midiutil==1.2.3

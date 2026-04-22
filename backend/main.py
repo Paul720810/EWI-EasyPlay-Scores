@@ -1,10 +1,11 @@
 """
 EWI EasyPlay - FastAPI 主應用
-集成所有 API 端點和服務
+集成所有 API 端點和異步處理
 """
 
 import logging
 import time
+import asyncio
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Form
 from fastapi.responses import FileResponse, JSONResponse
@@ -15,6 +16,14 @@ from typing import Optional, List, Dict
 import os
 from pathlib import Path
 
+# 導入自定義服務
+try:
+    from services import task_manager, audio_processor
+except ImportError:
+    # 如果 services.py 不存在，使用內聯模擬
+    task_manager = None
+    audio_processor = None
+
 # 配置日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,7 +32,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="EWI EasyPlay Scores API",
     description="AI 音樂轉 EWI 運指系統",
-    version="1.0.0",
+    version="2.0.0",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json"
 )
@@ -41,6 +50,56 @@ app.add_middleware(
 Path("temp").mkdir(exist_ok=True)
 Path("data").mkdir(exist_ok=True)
 Path("static").mkdir(exist_ok=True)
+
+# ==================== 簡易任務管理 ====================
+class SimpleTaskManager:
+    """簡易任務管理器"""
+    def __init__(self):
+        self.tasks = {}
+        self.task_counter = 0
+    
+    def create_task(self, task_type, **kwargs):
+        self.task_counter += 1
+        task_id = f"task_{self.task_counter}"
+        self.tasks[task_id] = {
+            "id": task_id,
+            "type": task_type,
+            "status": "processing",
+            "progress": 0,
+            "current_step": "初始化中...",
+            "error": None,
+            "results": None,
+            **kwargs
+        }
+        return task_id
+    
+    def update_task(self, task_id, **kwargs):
+        if task_id in self.tasks:
+            self.tasks[task_id].update(kwargs)
+    
+    def get_task(self, task_id):
+        return self.tasks.get(task_id)
+    
+    def complete_task(self, task_id, results):
+        if task_id in self.tasks:
+            self.tasks[task_id].update({
+                "status": "completed",
+                "progress": 100,
+                "current_step": "完成",
+                "results": results
+            })
+    
+    def fail_task(self, task_id, error):
+        if task_id in self.tasks:
+            self.tasks[task_id].update({
+                "status": "error",
+                "error": error,
+                "current_step": "錯誤"
+            })
+
+# 使用服務或簡易版本
+if task_manager is None:
+    task_manager = SimpleTaskManager()
 
 # 模擬簡譜數據庫
 SAMPLE_SHEETS = {
@@ -61,19 +120,19 @@ SAMPLE_SHEETS = {
     }
 }
 
+
 @app.get("/")
 async def root():
     """根端點"""
     return {
-        "message": "EWI EasyPlay Scores API",
-        "version": "1.0.0",
+        "message": "EWI EasyPlay Scores API v2.0",
+        "version": "2.0.0",
         "status": "running",
         "features": [
             "YouTube 音頻下載",
-            "音頻分析",
-            "簡譜生成",
-            "EWI 運指提示",
-            "Spotify 整合"
+            "音頻旋律分析",
+            "簡譜自動生成",
+            "MIDI 轉檔"
         ]
     }
 
@@ -84,145 +143,257 @@ async def health_check():
         "status": "healthy",
         "service": "ewi-backend",
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "dependencies": {
-            "fastapi": "✅ 正常",
-            "database": "✅ 正常",
-            "audio_processing": "✅ 正常"
-        }
+        "version": "2.0.0"
     }
 
-@app.post("/api/process-youtube")
-async def process_youtube(request: dict):
-    """處理 YouTube 音頻"""
+# ==================== 異步轉譜 API ====================
+
+@app.post("/api/process")
+async def process_audio(
+    request: dict,
+    background_tasks: BackgroundTasks
+):
+    """
+    處理音頻 - 異步端點
+    返回 task_id，前端輪詢 /api/status/{task_id}
+    """
     try:
-        url = request.get("url")
-        difficulty = request.get("difficulty", "normal")
-
-        if not url:
-            raise HTTPException(status_code=400, detail="URL is required")
-
-        logger.info(f"Processing YouTube URL: {url}")
-
-        # 模擬處理延遲
-        import asyncio
-        await asyncio.sleep(2)
-
-        # 獲取對應難度的簡譜
-        sheet_data = SAMPLE_SHEETS.get(difficulty, SAMPLE_SHEETS["normal"])
-
-        sheet_music = {
-            "title": f"YouTube 轉譜結果 ({difficulty})",
-            "notes": sheet_data["notes"],
-            "fingering": sheet_data["fingering"],
-            "tempo": sheet_data["tempo"],
-            "key": "C",
-            "difficulty": difficulty,
-            "source": "youtube",
-            "url": url[:50] + "..." if len(url) > 50 else url
-        }
-
+        youtube_url = request.get("youtube_url")
+        difficulty_levels = request.get("difficulty_levels", ["easy", "normal", "hard"])
+        title = request.get("title", "轉譜結果")
+        
+        if not youtube_url:
+            raise HTTPException(status_code=400, detail="需要提供 YouTube URL")
+        
+        # 創建任務
+        task_id = task_manager.create_task(
+            task_type="youtube",
+            youtube_url=youtube_url,
+            title=title,
+            difficulty_levels=difficulty_levels
+        )
+        
+        logger.info(f"任務已創建: {task_id}")
+        
+        # 異步處理
+        background_tasks.add_task(
+            process_youtube_task,
+            task_id,
+            youtube_url,
+            difficulty_levels
+        )
+        
         return {
-            "success": True,
-            "sheet_music": sheet_music,
-            "analysis": {
-                "duration": "3:45",
-                "key": "C major",
-                "estimated_difficulty": difficulty
-            },
-            "message": "YouTube 音頻處理成功"
+            "task_id": task_id,
+            "status": "accepted",
+            "message": "任務已接受，處理中..."
         }
-
+    
     except Exception as e:
-        logger.error(f"YouTube processing error: {str(e)}")
-        return {"success": False, "error": str(e)}
+        logger.error(f"任務創建失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/status/{task_id}")
+async def get_task_status(task_id: str):
+    """獲取任務狀態"""
+    task = task_manager.get_task(task_id)
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="任務不存在")
+    
+    return task
+
+
+# ==================== 異步任務執行 ====================
+
+async def process_youtube_task(
+    task_id: str,
+    youtube_url: str,
+    difficulty_levels: List[str]
+):
+    """背景任務：處理 YouTube 音樂"""
+    try:
+        logger.info(f"開始處理任務 {task_id}: {youtube_url}")
+        
+        # 模擬下載和分析
+        task_manager.update_task(
+            task_id,
+            progress=25,
+            current_step="下載音頻中..."
+        )
+        await asyncio.sleep(2)
+        
+        task_manager.update_task(
+            task_id,
+            progress=50,
+            current_step="分析音頻中..."
+        )
+        await asyncio.sleep(2)
+        
+        # 為每個難度生成簡譜和 MIDI
+        results = {}
+        
+        for idx, difficulty in enumerate(difficulty_levels):
+            progress = 60 + (idx * 10)
+            task_manager.update_task(
+                task_id,
+                progress=progress,
+                current_step=f"生成 {difficulty} 難度簡譜..."
+            )
+            
+            # 獲取簡譜數據
+            sheet_data = SAMPLE_SHEETS.get(difficulty, SAMPLE_SHEETS["normal"])
+            
+            results[difficulty] = {
+                "jianpu": sheet_data,
+                "midi": f"/data/sample_{difficulty}.mid"
+            }
+            
+            await asyncio.sleep(1)
+        
+        # 完成任務
+        task_manager.complete_task(task_id, results)
+        logger.info(f"任務 {task_id} 完成")
+    
+    except Exception as e:
+        logger.error(f"任務 {task_id} 失敗: {str(e)}")
+        task_manager.fail_task(task_id, str(e))
+
+
+# ==================== Spotify API ====================
+
+@app.get("/api/spotify/search")
+async def spotify_search(q: str, limit: int = 10):
+    """Spotify 搜尋"""
+    try:
+        mock_tracks = [
+            {
+                "id": f"track_{i}",
+                "name": f"{q} - 結果 {i}",
+                "artists": [{"name": "示例藝人"}],
+                "album": {
+                    "name": "示例專輯",
+                    "images": [{"url": "https://via.placeholder.com/300"}]
+                }
+            }
+            for i in range(min(limit, 5))
+        ]
+        
+        return {"tracks": {"items": mock_tracks}}
+    
+    except Exception as e:
+        logger.error(f"Spotify 搜尋失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/spotify/record-and-process")
+async def spotify_record_and_process(
+    request: dict,
+    background_tasks: BackgroundTasks
+):
+    """Spotify 錄製並轉譜"""
+    try:
+        task_id = task_manager.create_task(
+            task_type="spotify",
+            title=request.get("title", "Spotify 音樂")
+        )
+        
+        background_tasks.add_task(
+            process_spotify_task,
+            task_id,
+            request.get("difficulty_levels", ["easy", "normal", "hard"])
+        )
+        
+        return {
+            "task_id": task_id,
+            "status": "accepted",
+            "message": "Spotify 轉譜任務已接受"
+        }
+    
+    except Exception as e:
+        logger.error(f"Spotify 處理失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def process_spotify_task(task_id: str, difficulty_levels: List[str]):
+    """背景任務：處理 Spotify 音樂"""
+    try:
+        task_manager.update_task(task_id, progress=20, current_step="錄製中...")
+        await asyncio.sleep(3)
+        
+        results = {}
+        for difficulty in difficulty_levels:
+            results[difficulty] = {
+                "jianpu": SAMPLE_SHEETS.get(difficulty, SAMPLE_SHEETS["normal"]),
+                "midi": None
+            }
+        
+        task_manager.complete_task(task_id, results)
+    
+    except Exception as e:
+        logger.error(f"Spotify 任務失敗: {str(e)}")
+        task_manager.fail_task(task_id, str(e))
+
+
+# ==================== 本地音檔上傳 ====================
 
 @app.post("/api/upload-audio")
 async def upload_audio(
     audio: UploadFile = File(...),
-    difficulty: str = Form("normal")
+    background_tasks: BackgroundTasks = None
 ):
-    """上傳音頻文件處理"""
+    """上傳本地音檔轉譜"""
     try:
         if not audio.content_type.startswith('audio/'):
             raise HTTPException(status_code=400, detail="只支援音頻文件")
-
-        logger.info(f"Processing uploaded file: {audio.filename}")
-
-        # 模擬處理延遲
-        import asyncio
-        await asyncio.sleep(3)
-
-        # 獲取對應難度的簡譜
-        sheet_data = SAMPLE_SHEETS.get(difficulty, SAMPLE_SHEETS["normal"])
-
-        sheet_music = {
-            "title": f"{audio.filename} 轉譜結果 ({difficulty})",
-            "notes": sheet_data["notes"],
-            "fingering": sheet_data["fingering"],
-            "tempo": sheet_data["tempo"],
-            "key": "C",
-            "difficulty": difficulty,
-            "source": "upload",
-            "filename": audio.filename
-        }
-
-        return {
-            "success": True,
-            "sheet_music": sheet_music,
-            "analysis": {
-                "duration": "2:30",
-                "key": "C major",
-                "file_size": f"{audio.size} bytes" if audio.size else "unknown"
-            },
-            "message": "音頻文件處理成功"
-        }
-
-    except Exception as e:
-        logger.error(f"File upload error: {str(e)}")
-        return {"success": False, "error": str(e)}
-
-@app.get("/api/spotify/auth")
-async def spotify_auth():
-    """Spotify 授權"""
-    try:
-        client_id = os.getenv("SPOTIFY_CLIENT_ID", "d066b146a6d4440fbc395456da14b543")
-        redirect_uri = os.getenv("SPOTIFY_REDIRECT_URI", "https://ewi.paul720810.dpdns.org/api/spotify/callback")
-
-        scopes = [
-            "user-read-playback-state",
-            "user-modify-playback-state",
-            "user-read-currently-playing",
-            "streaming"
-        ]
-
-        auth_url = (
-            f"https://accounts.spotify.com/authorize?"
-            f"client_id={client_id}&"
-            f"response_type=code&"
-            f"redirect_uri={redirect_uri}&"
-            f"scope={' '.join(scopes)}"
+        
+        task_id = task_manager.create_task(
+            task_type="upload",
+            filename=audio.filename,
+            title=audio.filename
         )
-
-        return {"auth_url": auth_url}
-
+        
+        if background_tasks:
+            background_tasks.add_task(
+                process_upload_task,
+                task_id
+            )
+        
+        return {
+            "task_id": task_id,
+            "status": "accepted",
+            "message": "文件已上傳，處理中..."
+        }
+    
     except Exception as e:
-        logger.error(f"Spotify auth error: {str(e)}")
-        return {"success": False, "error": str(e)}
+        logger.error(f"上傳失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/spotify/callback")
-async def spotify_callback(code: str = None, error: str = None):
-    """Spotify 授權回調"""
-    if error:
-        return {"success": False, "error": f"Spotify 授權失敗: {error}"}
 
-    if not code:
-        return {"success": False, "error": "未收到授權碼"}
+async def process_upload_task(task_id: str):
+    """背景任務：處理上傳的音檔"""
+    try:
+        task_manager.update_task(task_id, progress=50, current_step="分析中...")
+        await asyncio.sleep(2)
+        
+        results = {}
+        for difficulty in ["easy", "normal", "hard"]:
+            results[difficulty] = {
+                "jianpu": SAMPLE_SHEETS.get(difficulty),
+                "midi": None
+            }
+        
+        task_manager.complete_task(task_id, results)
+    
+    except Exception as e:
+        logger.error(f"上傳文件任務失敗: {str(e)}")
+        task_manager.fail_task(task_id, str(e))
 
-    return {
-        "success": True,
-        "message": "Spotify 授權成功！現在可以使用 Spotify 功能了。",
-        "code": code[:20] + "..." if len(code) > 20 else code
-    }
+
+
+
+# ==================== 工具 API ====================
 
 @app.get("/api/difficulties")
 async def get_difficulties():
@@ -253,28 +424,26 @@ async def get_difficulties():
         ]
     }
 
+
 @app.get("/api/stats")
 async def get_stats():
     """獲取使用統計"""
     return {
-        "total_conversions": 1247,
-        "active_users": 89,
+        "total_tasks": len(task_manager.tasks),
+        "completed_tasks": len([t for t in task_manager.tasks.values() if t["status"] == "completed"]),
+        "active_tasks": len([t for t in task_manager.tasks.values() if t["status"] == "processing"]),
         "supported_formats": ["MP3", "WAV", "M4A", "FLAC"],
         "difficulty_levels": ["easy", "normal", "hard"],
         "features": {
             "youtube_download": True,
-            "file_upload": True,
-            "spotify_integration": True,
-            "ewi_fingering": True,
-            "interactive_practice": True,
-            "three_difficulties": True
-        },
-        "server_info": {
-            "status": "healthy",
-            "uptime": "99.9%",
-            "version": "1.0.0"
+            "audio_analysis": False,
+            "jianpu_generation": True,
+            "midi_generation": False,
+            "spotify_integration": False,
+            "ewi_fingering": False
         }
     }
+
 
 @app.get("/api/sample-sheet/{difficulty}")
 async def get_sample_sheet(difficulty: str):
@@ -295,6 +464,14 @@ async def get_sample_sheet(difficulty: str):
         }
     }
 
+
+# ==================== 靜態文件 ====================
+
+if Path("../frontend/dist").exists():
+    app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="frontend")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+
