@@ -13,6 +13,16 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import tempfile
 
+# 加載環境變數
+try:
+    from dotenv import load_dotenv
+    env_file = Path(__file__).parent / '.env'
+    if env_file.exists():
+        load_dotenv(env_file)
+        logging.info(f"✓ 已加載環境配置: {env_file}")
+except ImportError:
+    pass
+
 logger = logging.getLogger(__name__)
 
 class TaskManager:

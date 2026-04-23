@@ -17,6 +17,15 @@ from typing import Optional, List, Dict
 import os
 from pathlib import Path
 
+# 加載環境變數
+try:
+    from dotenv import load_dotenv
+    env_file = Path(__file__).parent / '.env'
+    if env_file.exists():
+        load_dotenv(env_file)
+except ImportError:
+    pass
+
 # 配置日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
