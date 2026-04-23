@@ -29,10 +29,14 @@ let progressText = null;
 let resultsSection = null;
 let appBootstrapped = false;
 
-// API 基礎 URL
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000'
-    : 'https://paul720810.dpdns.org/api';  // 使用主域 API 代理
+// API 基礎 URL - 支持多種域名配置
+const API_BASE = (() => {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return 'http://localhost:8000';
+    }
+    // 使用相對 URL - Worker 會攔截並轉發到後端
+    return '/api';
+})();
 
 function renderAppShell() {
     const app = document.getElementById('app');
