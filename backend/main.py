@@ -6,6 +6,7 @@ EWI EasyPlay - FastAPI 主應用
 import logging
 import time
 import asyncio
+import sys
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Form
 from fastapi.responses import FileResponse, JSONResponse
@@ -16,49 +17,14 @@ from typing import Optional, List, Dict
 import os
 from pathlib import Path
 
-# 導入自定義服務
-try:
-    from services import (
-        task_manager,
-        youtube_downloader,
-        audio_analyzer,
-        jianpu_generator,
-        ewi_fingering,
-        midi_generator,
-        spotify_integrator
-    )
-except ImportError as e:
-    logger.error(f"無法導入服務: {e}")
-    task_manager = None
-
 # 配置日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 創建 FastAPI 應用
-app = FastAPI(
-    title="EWI EasyPlay Scores API",
-    description="AI 音樂轉 EWI 運指系統",
-    version="2.0.0",
-    docs_url="/api/docs",
-    openapi_url="/api/openapi.json"
-)
+# 確保可以導入 services
+sys.path.insert(0, str(Path(__file__).parent))
 
-# 添加 CORS 中間件
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# 創建必要目錄
-Path("temp").mkdir(exist_ok=True)
-Path("data").mkdir(exist_ok=True)
-Path("static").mkdir(exist_ok=True)
-
-# ==================== 簡易任務管理 ====================
+# 簡易任務管理器 - 備用方案
 class SimpleTaskManager:
     """簡易任務管理器"""
     def __init__(self):
@@ -104,9 +70,78 @@ class SimpleTaskManager:
                 "current_step": "錯誤"
             })
 
-# 使用服務或簡易版本
-if task_manager is None:
-    task_manager = SimpleTaskManager()
+# 初始化全局任務管理器
+task_manager = SimpleTaskManager()
+
+# 嘗試導入完整服務
+try:
+    from services import (
+        TaskManager,
+        YouTubeDownloader,
+        AudioAnalyzer,
+        JianguGenerator,
+        EWIFingeringAlgorithm,
+        MIDIGenerator,
+        SpotifyIntegrator
+    )
+    logger.info("✓ 成功導入所有服務")
+    task_manager = TaskManager()
+    youtube_downloader = YouTubeDownloader(Path("temp"))
+    audio_analyzer = AudioAnalyzer()
+    jianpu_generator = JianguGenerator()
+    ewi_fingering = EWIFingeringAlgorithm()
+    midi_generator = MIDIGenerator()
+    spotify_integrator = SpotifyIntegrator()
+except Exception as e:
+    logger.warning(f"⚠ 使用簡易實現: {e}")
+    # 簡易實現的占位符
+    class YouTubeDownloader:
+        def __init__(self, path): pass
+    
+    class AudioAnalyzer:
+        pass
+    
+    class JianguGenerator:
+        pass
+    
+    class EWIFingeringAlgorithm:
+        pass
+    
+    class MIDIGenerator:
+        pass
+    
+    class SpotifyIntegrator:
+        pass
+    
+    youtube_downloader = YouTubeDownloader(Path("temp"))
+    audio_analyzer = AudioAnalyzer()
+    jianpu_generator = JianguGenerator()
+    ewi_fingering = EWIFingeringAlgorithm()
+    midi_generator = MIDIGenerator()
+    spotify_integrator = SpotifyIntegrator()
+
+# 創建 FastAPI 應用
+app = FastAPI(
+    title="EWI EasyPlay Scores API",
+    description="AI 音樂轉 EWI 運指系統",
+    version="2.0.0",
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json"
+)
+
+# 添加 CORS 中間件
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 創建必要目錄
+Path("temp").mkdir(exist_ok=True)
+Path("data").mkdir(exist_ok=True)
+Path("static").mkdir(exist_ok=True)
 
 # 模擬簡譜數據庫
 SAMPLE_SHEETS = {
@@ -223,10 +258,10 @@ async def process_youtube_task(
     """背景任務：處理 YouTube 音樂 - 完整實現"""
     try:
         logger.info(f"開始處理任務 {task_id}: {youtube_url}")
-        
+
         if not task_manager:
             raise Exception("服務不可用")
-        
+
         # 1️⃣ 下載 YouTube 音頻
         try:
             audio_path = await youtube_downloader.download(youtube_url, task_id, task_manager)
@@ -234,7 +269,7 @@ async def process_youtube_task(
             logger.error(f"YouTube 下載失敗: {e}")
             task_manager.fail_task(task_id, f"下載失敗: {str(e)}")
             return
-        
+
         # 2️⃣ 分析音頻
         try:
             notes = await audio_analyzer.analyze(audio_path, task_id, task_manager)
@@ -243,10 +278,10 @@ async def process_youtube_task(
             logger.error(f"音頻分析失敗: {e}")
             task_manager.fail_task(task_id, f"分析失敗: {str(e)}")
             return
-        
+
         # 3️⃣ 為每個難度生成簡譜、MIDI 和 EWI 運指
         results = {}
-        
+
         for idx, difficulty in enumerate(difficulty_levels):
             try:
                 progress = 60 + (idx * 13)
@@ -255,10 +290,10 @@ async def process_youtube_task(
                     progress=progress,
                     current_step=f"生成 {difficulty} 難度簡譜..."
                 )
-                
+
                 # 生成簡譜
                 jianpu = jianpu_generator.generate(notes, difficulty)
-                
+
                 # 生成 MIDI
                 midi_path = midi_generator.generate(
                     notes,
@@ -266,10 +301,10 @@ async def process_youtube_task(
                     difficulty,
                     Path("data")
                 )
-                
+
                 # 計算 EWI 運指
                 fingering = ewi_fingering.calculate_fingering(notes, difficulty)
-                
+
                 results[difficulty] = {
                     "jianpu": jianpu,
                     "midi": f"/data/ewi_{task_id}_{difficulty}.mid" if midi_path else None,
@@ -279,9 +314,9 @@ async def process_youtube_task(
                         "total_notes": len(fingering)
                     }
                 }
-                
+
                 logger.info(f"{difficulty} 難度完成: 簡譜 ✓, MIDI ✓, 運指 ✓")
-            
+
             except Exception as e:
                 logger.error(f"{difficulty} 難度生成失敗: {e}")
                 results[difficulty] = {
@@ -289,16 +324,16 @@ async def process_youtube_task(
                     "midi": None,
                     "error": str(e)
                 }
-        
+
         # 完成任務
         task_manager.complete_task(task_id, {
             "audio_path": audio_path,
             "notes_count": len(notes),
             "difficulty_results": results
         })
-        
+
         logger.info(f"任務 {task_id} 完成 ✅")
-    
+
     except Exception as e:
         logger.error(f"任務 {task_id} 失敗: {str(e)}")
         if task_manager:
@@ -312,13 +347,13 @@ async def spotify_search(q: str, limit: int = 10):
     """Spotify 搜尋 - 真實集成"""
     try:
         logger.info(f"搜尋 Spotify: {q}")
-        
+
         # 使用真實的 Spotify API
         tracks = await spotify_integrator.search_tracks(q, limit)
-        
+
         logger.info(f"找到 {len(tracks)} 首歌曲")
         return {"tracks": {"items": tracks}}
-    
+
     except Exception as e:
         logger.error(f"Spotify 搜尋失敗: {str(e)}")
         # 返回模擬數據而不是錯誤
@@ -346,20 +381,20 @@ async def spotify_record_and_process(
     try:
         if not task_manager:
             raise HTTPException(status_code=500, detail="服務不可用")
-        
+
         track_id = request.get("spotify_track_id")
         title = request.get("title", "Spotify 音樂")
         difficulty_levels = request.get("difficulty_levels", ["easy", "normal", "hard"])
-        
+
         task_id = task_manager.create_task(
             task_type="spotify",
             title=title,
             track_id=track_id,
             difficulty_levels=difficulty_levels
         )
-        
+
         logger.info(f"Spotify 轉譜任務已建立: {task_id}")
-        
+
         background_tasks.add_task(
             process_spotify_task,
             task_id,
@@ -367,13 +402,13 @@ async def spotify_record_and_process(
             track_id,
             title
         )
-        
+
         return {
             "task_id": task_id,
             "status": "accepted",
             "message": "Spotify 轉譜任務已接受"
         }
-    
+
     except Exception as e:
         logger.error(f"Spotify 處理失敗: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -389,22 +424,22 @@ async def process_spotify_task(
     try:
         if not task_manager:
             return
-        
+
         logger.info(f"處理 Spotify 任務 {task_id}: {track_id}")
-        
+
         # 模擬 Spotify 錄製 (實際需要 Web Audio API 在前端錄製)
         task_manager.update_task(task_id, progress=20, current_step="連接 Spotify...")
         await asyncio.sleep(1)
-        
+
         task_manager.update_task(task_id, progress=40, current_step="錄製音頻中...")
         await asyncio.sleep(3)
-        
+
         # 模擬得到音頻數據
         demo_notes = [
-            {"midi": 60 + i, "note": str(i % 7 + 1)} 
+            {"midi": 60 + i, "note": str(i % 7 + 1)}
             for i in range(20)
         ]
-        
+
         # 為每個難度生成結果
         results = {}
         for idx, difficulty in enumerate(difficulty_levels):
@@ -414,10 +449,10 @@ async def process_spotify_task(
                 progress=progress,
                 current_step=f"生成 {difficulty} 難度..."
             )
-            
+
             jianpu = jianpu_generator.generate(demo_notes, difficulty)
             fingering = ewi_fingering.calculate_fingering(demo_notes, difficulty)
-            
+
             results[difficulty] = {
                 "jianpu": jianpu,
                 "ewi_fingering": {
@@ -427,10 +462,10 @@ async def process_spotify_task(
                 },
                 "source": "spotify"
             }
-        
+
         task_manager.complete_task(task_id, results)
         logger.info(f"Spotify 任務 {task_id} 完成 ✅")
-    
+
     except Exception as e:
         logger.error(f"Spotify 任務失敗: {str(e)}")
         if task_manager:

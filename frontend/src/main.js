@@ -32,7 +32,7 @@ let appBootstrapped = false;
 // API 基礎 URL
 const API_BASE = window.location.hostname === 'localhost'
     ? 'http://localhost:8000'
-    : 'https://ewi.paul720810.dpdns.org';
+    : 'http://140.245.126.35:8000';  // 直接使用 OCI VM 公網 IP
 
 function renderAppShell() {
     const app = document.getElementById('app');

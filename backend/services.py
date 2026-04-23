@@ -67,47 +67,47 @@ class YouTubeDownloader:
     
     def __init__(self, temp_dir: Path):
         self.temp_dir = temp_dir
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
     
     async def download(self, url: str, task_id: str, task_manager: TaskManager) -> Optional[str]:
         """使用 yt-dlp 下載 YouTube 音頻"""
         try:
             task_manager.update_task(task_id, current_step="下載 YouTube 音頻中...", progress=10)
             
+            import yt_dlp
+            
             output_path = self.temp_dir / f"{task_id}.mp3"
             
-            cmd = [
-                "yt-dlp",
-                "-f", "bestaudio/best",
-                "-x",
-                "--audio-format", "mp3",
-                "--audio-quality", "192",
-                "--quiet",
-                "-o", str(output_path),
-                url
-            ]
+            # yt-dlp 配置
+            ydl_opts = {
+                'format': 'bestaudio/best',
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }],
+                'outtmpl': str(self.temp_dir / f"{task_id}"),
+                'quiet': False,
+                'no_warnings': True,
+            }
             
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
+            # 在線程中運行下載，避免阻塞
+            loop = asyncio.get_event_loop()
             
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(),
-                timeout=300
-            )
+            def download_impl():
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
+                return output_path
             
-            if process.returncode != 0:
-                error_msg = stderr.decode() if stderr else "未知錯誤"
-                raise Exception(f"下載失敗: {error_msg[:100]}")
+            result_path = await loop.run_in_executor(None, download_impl)
             
-            if not output_path.exists():
-                raise Exception("下載完成但找不到文件")
-            
-            task_manager.update_task(task_id, progress=25)
-            logger.info(f"成功下載: {output_path}")
-            
-            return str(output_path)
+            # 檢查輸出文件
+            if result_path.exists():
+                task_manager.update_task(task_id, progress=25)
+                logger.info(f"成功下載: {result_path}")
+                return str(result_path)
+            else:
+                raise Exception(f"下載後找不到文件: {result_path}")
         
         except Exception as e:
             logger.error(f"YouTube 下載錯誤: {str(e)}")
