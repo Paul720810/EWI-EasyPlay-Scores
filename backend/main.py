@@ -93,6 +93,7 @@ try:
         MIDIGenerator,
         SpotifyIntegrator
     )
+    from kaggle_integrator import KaggleIntegrator
     logger.info("✓ 成功導入所有服務")
     task_manager = TaskManager()
     youtube_downloader = YouTubeDownloader(Path("temp"))
@@ -101,33 +102,39 @@ try:
     ewi_fingering = EWIFingeringAlgorithm()
     midi_generator = MIDIGenerator()
     spotify_integrator = SpotifyIntegrator()
+    kaggle_integrator = KaggleIntegrator(Path("data") / "kaggle")
+    logger.info("✓ Kaggle 集成已初始化")
 except Exception as e:
     logger.warning(f"⚠ 使用簡易實現: {e}")
     # 簡易實現的占位符
     class YouTubeDownloader:
         def __init__(self, path): pass
-    
+
     class AudioAnalyzer:
         pass
-    
+
     class JianguGenerator:
         pass
-    
+
     class EWIFingeringAlgorithm:
         pass
-    
+
     class MIDIGenerator:
         pass
-    
+
     class SpotifyIntegrator:
         pass
     
+    class KaggleIntegrator:
+        def __init__(self, path): pass
+
     youtube_downloader = YouTubeDownloader(Path("temp"))
     audio_analyzer = AudioAnalyzer()
     jianpu_generator = JianguGenerator()
     ewi_fingering = EWIFingeringAlgorithm()
     midi_generator = MIDIGenerator()
     spotify_integrator = SpotifyIntegrator()
+    kaggle_integrator = KaggleIntegrator(Path("data") / "kaggle")
 
 # 創建 FastAPI 應用
 app = FastAPI(
@@ -477,6 +484,141 @@ async def process_spotify_task(
 
     except Exception as e:
         logger.error(f"Spotify 任務失敗: {str(e)}")
+        if task_manager:
+            task_manager.fail_task(task_id, str(e))
+
+
+# ==================== Kaggle 數據集集成 ====================
+
+@app.get("/api/kaggle/datasets/popular")
+async def get_popular_datasets():
+    """獲取流行的音樂數據集"""
+    try:
+        logger.info("獲取流行的 Kaggle 音樂數據集")
+        datasets = await kaggle_integrator.get_popular_music_datasets()
+        return {
+            "status": "success",
+            "datasets": datasets,
+            "message": f"找到 {len(datasets)} 個流行數據集"
+        }
+    except Exception as e:
+        logger.error(f"獲取數據集失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/kaggle/datasets/search")
+async def search_kaggle_datasets(q: str, limit: int = 10):
+    """搜尋 Kaggle 數據集"""
+    try:
+        if not q:
+            raise HTTPException(status_code=400, detail="搜尋查詢不能為空")
+        
+        logger.info(f"搜尋 Kaggle 數據集: {q}")
+        datasets = await kaggle_integrator.search_datasets(q, min(limit, 50))
+        
+        return {
+            "status": "success",
+            "query": q,
+            "datasets": datasets,
+            "count": len(datasets)
+        }
+    except Exception as e:
+        logger.error(f"搜尋失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/kaggle/datasets/download")
+async def download_kaggle_dataset(
+    request: dict,
+    background_tasks: BackgroundTasks = None
+):
+    """下載 Kaggle 數據集"""
+    try:
+        dataset_ref = request.get("dataset_ref")
+        if not dataset_ref:
+            raise HTTPException(status_code=400, detail="dataset_ref 必須提供")
+        
+        task_id = task_manager.create_task(
+            task_type="kaggle_download",
+            title=f"Kaggle: {dataset_ref}",
+            dataset_ref=dataset_ref
+        )
+        
+        logger.info(f"Kaggle 下載任務已建立: {task_id}")
+        
+        if background_tasks:
+            background_tasks.add_task(
+                process_kaggle_download_task,
+                task_id,
+                dataset_ref
+            )
+        
+        return {
+            "task_id": task_id,
+            "status": "accepted",
+            "message": f"開始下載 Kaggle 數據集: {dataset_ref}"
+        }
+    
+    except Exception as e:
+        logger.error(f"Kaggle 下載設置失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/kaggle/config/status")
+async def get_kaggle_config_status():
+    """檢查 Kaggle 配置狀態"""
+    try:
+        kaggle_json = Path.home() / ".kaggle" / "kaggle.json"
+        is_configured = kaggle_json.exists()
+        
+        return {
+            "status": "success",
+            "configured": is_configured,
+            "config_path": str(kaggle_json),
+            "instructions": {
+                "step1": "訪問 https://www.kaggle.com/settings/account",
+                "step2": "點擊 'Create New Token' 下載 kaggle.json",
+                "step3": f"放置到 {kaggle_json}",
+                "step4": "重新啟動後端"
+            } if not is_configured else None
+        }
+    except Exception as e:
+        logger.error(f"檢查配置失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def process_kaggle_download_task(task_id: str, dataset_ref: str):
+    """背景任務：下載 Kaggle 數據集"""
+    try:
+        if not task_manager:
+            return
+        
+        logger.info(f"開始下載 Kaggle 數據集: {dataset_ref}")
+        
+        await kaggle_integrator.download_dataset(
+            dataset_ref,
+            task_manager=task_manager,
+            task_id=task_id
+        )
+        
+        dataset_path = Path("data") / "kaggle" / dataset_ref.replace('/', '_')
+        
+        # 獲取數據集統計
+        files = []
+        if dataset_path.exists():
+            files = [str(f.name) for f in dataset_path.iterdir() if f.is_file()][:10]
+        
+        task_manager.complete_task(task_id, {
+            "dataset_ref": dataset_ref,
+            "path": str(dataset_path),
+            "files": files,
+            "status": "completed"
+        })
+        
+        logger.info(f"Kaggle 下載完成: {task_id} ✅")
+    
+    except Exception as e:
+        logger.error(f"Kaggle 下載失敗: {str(e)}")
         if task_manager:
             task_manager.fail_task(task_id, str(e))
 
