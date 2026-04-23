@@ -30,9 +30,9 @@ let resultsSection = null;
 let appBootstrapped = false;
 
 // API 基礎 URL
-const API_BASE = window.location.hostname === 'localhost'
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:8000'
-    : 'http://140.245.126.35:8000';  // 直接使用 OCI VM 公網 IP
+    : '/api';  // 使用相對 URL，通過當前域名的代理
 
 function renderAppShell() {
     const app = document.getElementById('app');
