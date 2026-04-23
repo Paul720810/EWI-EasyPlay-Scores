@@ -124,7 +124,7 @@ except Exception as e:
 
     class SpotifyIntegrator:
         pass
-    
+
     class KaggleIntegrator:
         def __init__(self, path): pass
 
@@ -512,10 +512,10 @@ async def search_kaggle_datasets(q: str, limit: int = 10):
     try:
         if not q:
             raise HTTPException(status_code=400, detail="搜尋查詢不能為空")
-        
+
         logger.info(f"搜尋 Kaggle 數據集: {q}")
         datasets = await kaggle_integrator.search_datasets(q, min(limit, 50))
-        
+
         return {
             "status": "success",
             "query": q,
@@ -537,28 +537,28 @@ async def download_kaggle_dataset(
         dataset_ref = request.get("dataset_ref")
         if not dataset_ref:
             raise HTTPException(status_code=400, detail="dataset_ref 必須提供")
-        
+
         task_id = task_manager.create_task(
             task_type="kaggle_download",
             title=f"Kaggle: {dataset_ref}",
             dataset_ref=dataset_ref
         )
-        
+
         logger.info(f"Kaggle 下載任務已建立: {task_id}")
-        
+
         if background_tasks:
             background_tasks.add_task(
                 process_kaggle_download_task,
                 task_id,
                 dataset_ref
             )
-        
+
         return {
             "task_id": task_id,
             "status": "accepted",
             "message": f"開始下載 Kaggle 數據集: {dataset_ref}"
         }
-    
+
     except Exception as e:
         logger.error(f"Kaggle 下載設置失敗: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -570,7 +570,7 @@ async def get_kaggle_config_status():
     try:
         kaggle_json = Path.home() / ".kaggle" / "kaggle.json"
         is_configured = kaggle_json.exists()
-        
+
         return {
             "status": "success",
             "configured": is_configured,
@@ -592,31 +592,31 @@ async def process_kaggle_download_task(task_id: str, dataset_ref: str):
     try:
         if not task_manager:
             return
-        
+
         logger.info(f"開始下載 Kaggle 數據集: {dataset_ref}")
-        
+
         await kaggle_integrator.download_dataset(
             dataset_ref,
             task_manager=task_manager,
             task_id=task_id
         )
-        
+
         dataset_path = Path("data") / "kaggle" / dataset_ref.replace('/', '_')
-        
+
         # 獲取數據集統計
         files = []
         if dataset_path.exists():
             files = [str(f.name) for f in dataset_path.iterdir() if f.is_file()][:10]
-        
+
         task_manager.complete_task(task_id, {
             "dataset_ref": dataset_ref,
             "path": str(dataset_path),
             "files": files,
             "status": "completed"
         })
-        
+
         logger.info(f"Kaggle 下載完成: {task_id} ✅")
-    
+
     except Exception as e:
         logger.error(f"Kaggle 下載失敗: {str(e)}")
         if task_manager:

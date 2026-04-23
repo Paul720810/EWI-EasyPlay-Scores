@@ -32,7 +32,7 @@ let appBootstrapped = false;
 // API 基礎 URL
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:8000'
-    : '/api';  // 使用相對 URL，通過當前域名的代理
+    : 'https://paul720810.dpdns.org/api';  // 使用主域 API 代理
 
 function renderAppShell() {
     const app = document.getElementById('app');
