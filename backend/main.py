@@ -102,8 +102,17 @@ try:
     ewi_fingering = EWIFingeringAlgorithm()
     midi_generator = MIDIGenerator()
     spotify_integrator = SpotifyIntegrator()
-    kaggle_integrator = KaggleIntegrator(Path("data") / "kaggle")
-    logger.info("✓ Kaggle 集成已初始化")
+    try:
+        kaggle_integrator = KaggleIntegrator(Path("data") / "kaggle")
+        logger.info("✓ Kaggle 集成已初始化")
+    except Exception as kaggle_error:
+        logger.warning(f"⚠ Kaggle 初始化失敗，將停用 Kaggle 功能: {kaggle_error}")
+
+        class KaggleIntegrator:
+            def __init__(self, path):
+                pass
+
+        kaggle_integrator = KaggleIntegrator(Path("data") / "kaggle")
 except Exception as e:
     logger.warning(f"⚠ 使用簡易實現: {e}")
     # 簡易實現的占位符

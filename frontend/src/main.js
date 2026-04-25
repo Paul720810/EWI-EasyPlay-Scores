@@ -31,12 +31,23 @@ let appBootstrapped = false;
 
 // API 基礎 URL - 支持多種域名配置
 const API_BASE = (() => {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return 'http://localhost:8000';
+    const configuredBase = (import.meta.env.VITE_API_BASE || '').trim();
+    if (configuredBase) {
+        return configuredBase.replace(/\/+$/, '');
     }
-    // 使用相對 URL - Worker 會攔截並轉發到後端
-    return '/api';
+
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return 'http://localhost:8001';
+    }
+
+    // 生產環境預設同源，交由反向代理或 Worker 轉發
+    return '';
 })();
+
+function buildApiUrl(path) {
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${API_BASE}${normalizedPath}`;
+}
 
 function renderAppShell() {
     const app = document.getElementById('app');
@@ -237,7 +248,7 @@ async function processYouTubeUrl() {
         updateProgress(0, '準備處理...');
 
         // 發送處理請求
-        const response = await fetch(`${API_BASE}/api/process`, {
+        const response = await fetch(buildApiUrl('/api/process'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -271,7 +282,7 @@ async function processYouTubeUrl() {
 // 輪詢任務狀態
 async function pollTaskStatus(taskId) {
     try {
-        const response = await fetch(`${API_BASE}/api/status/${taskId}`);
+        const response = await fetch(buildApiUrl(`/api/status/${taskId}`));
 
         if (!response.ok) {
             throw new Error(`無法獲取任務狀態: ${response.status}`);
@@ -320,7 +331,7 @@ async function searchSpotifyTracks() {
         searchBtn.disabled = true;
         searchBtn.textContent = '搜尋中...';
 
-        const response = await fetch(`${API_BASE}/api/spotify/search?q=${encodeURIComponent(query)}&limit=10`);
+        const response = await fetch(buildApiUrl(`/api/spotify/search?q=${encodeURIComponent(query)}&limit=10`));
 
         if (!response.ok) {
             throw new Error(`搜尋失敗: ${response.status}`);
@@ -406,7 +417,7 @@ async function recordAndProcessSpotify() {
         updateProgress(0, '準備錄製...');
 
         // 發送錄製請求
-        const response = await fetch(`${API_BASE}/api/spotify/record-and-process`, {
+        const response = await fetch(buildApiUrl('/api/spotify/record-and-process'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -500,10 +511,10 @@ function showResults(taskStatus) {
             <h4>📥 下載檔案</h4>
             <div class="download-buttons">
                 ${Object.entries(taskStatus.results).map(([difficulty, files]) => `
-                    <a href="${API_BASE}${files.midi}" class="download-btn" download>
+                    <a href="${buildApiUrl(files.midi)}" class="download-btn" download>
                         📄 ${difficulty.toUpperCase()} MIDI
                     </a>
-                    ${files.pdf ? `<a href="${API_BASE}${files.pdf}" class="download-btn" download>
+                    ${files.pdf ? `<a href="${buildApiUrl(files.pdf)}" class="download-btn" download>
                         📄 ${difficulty.toUpperCase()} PDF
                     </a>` : ''}
                 `).join('')}
@@ -572,7 +583,7 @@ async function loadMidiForDifficulty(difficulty) {
     }
 
     try {
-        const midiUrl = `${API_BASE}${currentResults[difficulty].midi}`;
+        const midiUrl = buildApiUrl(currentResults[difficulty].midi);
         console.log(`載入 ${difficulty} MIDI:`, midiUrl);
 
         // 使用 Tone.js 載入 MIDI

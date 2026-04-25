@@ -88,26 +88,48 @@ class YouTubeDownloader:
 
             output_path = self.temp_dir / f"{task_id}.mp3"
 
-            # yt-dlp 配置
-            ydl_opts = {
-                'format': 'bestaudio/best',
-                'postprocessors': [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
-                }],
-                'outtmpl': str(self.temp_dir / f"{task_id}"),
-                'quiet': False,
-                'no_warnings': True,
-            }
-
-            # 在線程中運行下載，避免阻塞
+            # 在線程中運行下載，避免阻塞。
+            # 某些影片在特定格式選擇下會報 "Requested format is not available"，這裡做多組 fallback。
             loop = asyncio.get_event_loop()
 
             def download_impl():
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
-                return output_path
+                # 優先嘗試可直接抽取音訊，其次回退到常見 HLS mp4 清晰度格式。
+                format_candidates = [
+                    "bestaudio/best",
+                    "bestaudio*",
+                    "95/94/93/92/91/best",
+                    "best"
+                ]
+                last_error = None
+
+                for fmt in format_candidates:
+                    ydl_opts = {
+                        'format': fmt,
+                        'extractor_args': {
+                            'youtube': {
+                                'player_client': ['tv', 'web_safari', 'ios']
+                            }
+                        },
+                        'postprocessors': [{
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': 'mp3',
+                            'preferredquality': '192',
+                        }],
+                        'outtmpl': str(self.temp_dir / f"{task_id}"),
+                        'quiet': False,
+                        'no_warnings': True,
+                    }
+
+                    try:
+                        logger.info(f"yt-dlp 嘗試格式: {fmt}")
+                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                            ydl.download([url])
+                        return output_path
+                    except Exception as err:
+                        last_error = err
+                        logger.warning(f"yt-dlp 格式 {fmt} 下載失敗: {err}")
+
+                raise last_error if last_error else Exception("yt-dlp 下載失敗")
 
             result_path = await loop.run_in_executor(None, download_impl)
 

@@ -43,7 +43,7 @@ function setupEventListeners() {
 // 檢查後端連接
 async function checkBackendConnection() {
     try {
-        const response = await fetch('http://140.245.126.35:8001/health');
+        const response = await fetch('/health');
         const data = await response.json();
         console.log('後端連接正常:', data);
     } catch (error) {
@@ -102,7 +102,7 @@ async function processYouTube() {
         showLoading(true);
         showProgress(true);
         
-        const response = await fetch('http://140.245.126.35:8001/api/process-youtube', {
+        const response = await fetch('/api/process-youtube', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -176,7 +176,7 @@ async function processAudioFile(file) {
         formData.append('audio', file);
         formData.append('difficulty', currentDifficulty);
         
-        const response = await fetch('http://140.245.126.35:8001/api/upload-audio', {
+        const response = await fetch('/api/upload-audio', {
             method: 'POST',
             body: formData
         });
@@ -235,7 +235,7 @@ function displaySheetMusic(sheetMusic) {
 // Spotify 連接
 async function connectSpotify() {
     try {
-        const response = await fetch('http://140.245.126.35:8001/api/spotify/auth');
+        const response = await fetch('/api/spotify/auth');
         const result = await response.json();
         
         if (result.auth_url) {
